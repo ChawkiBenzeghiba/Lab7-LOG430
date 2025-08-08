@@ -1,0 +1,26 @@
+@startuml
+title Machine d'état - Saga Commande
+
+[*] --> CREEE
+
+state CREEE
+state STOCK_VERIFIE
+state STOCK_RESERVE
+state PAIEMENT_TENTE
+state CONFIRMEE #lightgreen
+state ANNULEE #pink
+
+CREEE --> STOCK_VERIFIE : verifierStock / OK
+CREEE --> ANNULEE       : verifierStock / KO
+
+STOCK_VERIFIE --> STOCK_RESERVE : reserverStock / OK
+STOCK_VERIFIE --> ANNULEE       : reserverStock / KO
+
+STOCK_RESERVE --> PAIEMENT_TENTE : paiement / tenter
+
+PAIEMENT_TENTE --> CONFIRMEE : paiement / OK\nconfirmerCommande
+PAIEMENT_TENTE --> ANNULEE   : paiement / KO\ncompensation: libererStock + annulerPaiement
+
+CONFIRMEE --> [*]
+ANNULEE   --> [*]
+@enduml
