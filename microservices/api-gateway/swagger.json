@@ -1,0 +1,751 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "API Gateway - Microservices E-commerce",
+    "description": "API Gateway centralisant tous les microservices de l'application e-commerce avec load balancing et sécurité CORS",
+    "version": "1.0.0",
+    "contact": {
+      "name": "LOG430 - Lab5",
+      "email": "support@ecommerce.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "API Gateway local"
+    },
+    {
+      "url": "http://api-gateway:3000",
+      "description": "API Gateway Docker"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Informations de l'API Gateway",
+        "description": "Retourne les informations générales de l'API Gateway, les services disponibles et la configuration du load balancing",
+        "tags": ["Gateway"],
+        "responses": {
+          "200": {
+            "description": "Informations de l'API Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "API Gateway - Microservices E-commerce"
+                    },
+                    "version": {
+                      "type": "string",
+                      "example": "1.0.0"
+                    },
+                    "services": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "example": ["produits", "clients", "panier", "commandes", "ventes", "stock"]
+                    },
+                    "loadBalancing": {
+                      "type": "object",
+                      "properties": {
+                        "panier": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "example": "round-robin"
+                            },
+                            "instances": {
+                              "type": "integer",
+                              "example": 2
+                            },
+                            "instances_urls": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Vérifie l'état de santé de l'API Gateway et du load balancing",
+        "tags": ["Gateway"],
+        "responses": {
+          "200": {
+            "description": "État de santé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "uptime": {
+                      "type": "number"
+                    },
+                    "loadBalancing": {
+                      "type": "object",
+                      "properties": {
+                        "panier": {
+                          "type": "object",
+                          "properties": {
+                            "currentInstance": {
+                              "type": "integer"
+                            },
+                            "totalInstances": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cors-test": {
+      "get": {
+        "summary": "Test CORS",
+        "description": "Endpoint de test pour vérifier la configuration CORS",
+        "tags": ["Gateway"],
+        "responses": {
+          "200": {
+            "description": "Test CORS réussi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "CORS test successful"
+                    },
+                    "origin": {
+                      "type": "string"
+                    },
+                    "method": {
+                      "type": "string"
+                    },
+                    "cors": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "methods": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "allowedHeaders": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/produits": {
+      "get": {
+        "summary": "Récupérer tous les produits",
+        "description": "Récupère la liste de tous les produits disponibles",
+        "tags": ["Produits"],
+        "responses": {
+          "200": {
+            "description": "Liste des produits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Produit"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Créer un nouveau produit",
+        "description": "Ajoute un nouveau produit au catalogue",
+        "tags": ["Produits"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProduitInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Produit créé avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Produit"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/produits/{id}": {
+      "get": {
+        "summary": "Récupérer un produit par ID",
+        "description": "Récupère les détails d'un produit spécifique",
+        "tags": ["Produits"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ID du produit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Détails du produit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Produit"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Produit non trouvé"
+          }
+        }
+      }
+    },
+    "/api/panier/client/{clientId}": {
+      "get": {
+        "summary": "Récupérer le panier d'un client",
+        "description": "Récupère le contenu du panier d'un client spécifique (avec load balancing)",
+        "tags": ["Panier"],
+        "parameters": [
+          {
+            "name": "clientId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ID du client"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contenu du panier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/PanierItem"
+                          }
+                        },
+                        "total": {
+                          "type": "number"
+                        },
+                        "count": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/panier/client/{clientId}/ajouter": {
+      "post": {
+        "summary": "Ajouter un produit au panier",
+        "description": "Ajoute un produit au panier d'un client (avec load balancing)",
+        "tags": ["Panier"],
+        "parameters": [
+          {
+            "name": "clientId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ID du client"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["produitId", "quantite", "prixUnitaire"],
+                "properties": {
+                  "produitId": {
+                    "type": "integer",
+                    "description": "ID du produit"
+                  },
+                  "quantite": {
+                    "type": "integer",
+                    "description": "Quantité à ajouter"
+                  },
+                  "prixUnitaire": {
+                    "type": "number",
+                    "description": "Prix unitaire du produit"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Produit ajouté au panier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/PanierItem"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erreur de validation ou stock insuffisant"
+          }
+        }
+      }
+    },
+    "/api/commandes/client/{clientId}": {
+      "get": {
+        "summary": "Récupérer les commandes d'un client",
+        "description": "Récupère l'historique des commandes d'un client",
+        "tags": ["Commandes"],
+        "parameters": [
+          {
+            "name": "clientId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ID du client"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des commandes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Commande"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commandes/client/{clientId}/valider": {
+      "post": {
+        "summary": "Valider une commande",
+        "description": "Valide le panier d'un client en créant une commande",
+        "tags": ["Commandes"],
+        "parameters": [
+          {
+            "name": "clientId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ID du client"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["items", "adresseLivraison", "adresseFacturation", "methodePaiement"],
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "produitId": {
+                          "type": "integer"
+                        },
+                        "quantite": {
+                          "type": "integer"
+                        },
+                        "prixUnitaire": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  },
+                  "adresseLivraison": {
+                    "type": "string"
+                  },
+                  "adresseFacturation": {
+                    "type": "string"
+                  },
+                  "methodePaiement": {
+                    "type": "string",
+                    "enum": ["carte_credit", "paypal", "virement"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Commande validée avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "commande": {
+                          "$ref": "#/components/schemas/Commande"
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/CommandeItem"
+                          }
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stock/stock-central": {
+      "get": {
+        "summary": "Récupérer l'état du stock central",
+        "description": "Récupère l'inventaire complet du stock central",
+        "tags": ["Stock"],
+        "responses": {
+          "200": {
+            "description": "État du stock",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "inventaire": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Produit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "ID unique du produit"
+          },
+          "nom": {
+            "type": "string",
+            "description": "Nom du produit"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description du produit"
+          },
+          "prix": {
+            "type": "number",
+            "description": "Prix du produit"
+          },
+          "categorie": {
+            "type": "string",
+            "description": "Catégorie du produit"
+          },
+          "codeProduit": {
+            "type": "string",
+            "description": "Code unique du produit"
+          },
+          "quantiteStock": {
+            "type": "integer",
+            "description": "Quantité en stock"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProduitInput": {
+        "type": "object",
+        "required": ["nom", "description", "prix", "categorie", "codeProduit", "quantiteStock"],
+        "properties": {
+          "nom": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "prix": {
+            "type": "number"
+          },
+          "categorie": {
+            "type": "string"
+          },
+          "codeProduit": {
+            "type": "string"
+          },
+          "quantiteStock": {
+            "type": "integer"
+          }
+        }
+      },
+      "PanierItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "clientId": {
+            "type": "integer"
+          },
+          "produitId": {
+            "type": "integer"
+          },
+          "quantite": {
+            "type": "integer"
+          },
+          "prixUnitaire": {
+            "type": "number"
+          },
+          "actif": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Commande": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "clientId": {
+            "type": "integer"
+          },
+          "dateCommande": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "statut": {
+            "type": "string",
+            "enum": ["en_attente", "confirmee", "expediee", "livree", "annulee"]
+          },
+          "adresseLivraison": {
+            "type": "string"
+          },
+          "adresseFacturation": {
+            "type": "string"
+          },
+          "methodePaiement": {
+            "type": "string"
+          },
+          "total": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CommandeItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "commandeId": {
+            "type": "integer"
+          },
+          "produitId": {
+            "type": "integer"
+          },
+          "quantite": {
+            "type": "integer"
+          },
+          "prixUnitaire": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Gateway",
+      "description": "Endpoints de l'API Gateway"
+    },
+    {
+      "name": "Produits",
+      "description": "Gestion des produits"
+    },
+    {
+      "name": "Panier",
+      "description": "Gestion du panier (avec load balancing)"
+    },
+    {
+      "name": "Commandes",
+      "description": "Gestion des commandes"
+    },
+    {
+      "name": "Stock",
+      "description": "Gestion du stock"
+    }
+  ]
+} 

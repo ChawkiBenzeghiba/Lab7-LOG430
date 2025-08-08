@@ -1,0 +1,68 @@
+{
+  "uid": "saga-overview",
+  "title": "Saga Orchestrator Overview",
+  "schemaVersion": 38,
+  "version": 1,
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Total Sagas (All States)",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "sum(saga_total)", "refId": "A" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Sagas Confirmées",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [
+        { "expr": "sum(saga_total{etat_final=\"CONFIRMEE\"})", "refId": "A" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Sagas Annulées",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "sum(saga_total{etat_final=\"ANNULEE\"})", "refId": "A" }
+      ]
+    },
+    {
+      "type": "gauge",
+      "title": "Taux de Succès (%)",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        { "expr": "100 * (sum(saga_total{etat_final=\"CONFIRMEE\"}) / clamp_min(sum(saga_total), 1))", "refId": "A" }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Durée des Sagas (s)",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 4 },
+      "lines": true,
+      "targets": [
+        { "expr": "sum(rate(saga_duration_seconds_sum[1m])) / clamp_min(sum(rate(saga_duration_seconds_count[1m])), 1)", "legendFormat": "Durée moyenne (1m)", "refId": "A" }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "title": "Compensations par type",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 4 },
+      "targets": [
+        { "expr": "sum(compensation_total) by (type)", "refId": "A" }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Sagas (compteur par état final)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 13 },
+      "targets": [
+        { "expr": "sum(saga_total) by (etat_final)", "refId": "A" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "service-ventes",
+  "version": "1.0.0",
+  "description": "Service de gestion des ventes et retours",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "pg": "^8.16.0",
+    "sequelize": "^6.37.7",
+    "ioredis": "^5.4.1",
+    "uuid": "^9.0.1",
+    "prom-client": "^15.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0",
+    "jest": "^29.7.0"
+  }
+} 

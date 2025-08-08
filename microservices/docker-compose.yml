@@ -1,0 +1,485 @@
+version: '3.9'
+
+services:
+  # Broker d'événements (Pub/Sub)
+  redis:
+    image: redis:7-alpine
+    container_name: microservices_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+  # Base de données pour le service Produits
+  db-produits:
+    image: postgres:14
+    container_name: microservices_db_produits
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: produits_db
+    volumes:
+      - pgdata_produits:/var/lib/postgresql/data
+    ports:
+      - "5431:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Base de données pour le service Clients
+  db-clients:
+    image: postgres:14
+    container_name: microservices_db_clients
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: clients_db
+    volumes:
+      - pgdata_clients:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Base de données pour le service Ventes
+  db-ventes:
+    image: postgres:14
+    container_name: microservices_db_ventes
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ventes_db
+    volumes:
+      - pgdata_ventes:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Base de données pour le service Stock
+  db-stock:
+    image: postgres:14
+    container_name: microservices_db_stock
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: stock_db
+    volumes:
+      - pgdata_stock:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Base de données pour le service Panier
+  db-panier:
+    image: postgres:14
+    container_name: microservices_db_panier
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: panier_db
+    volumes:
+      - pgdata_panier:/var/lib/postgresql/data
+    ports:
+      - "5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Base de données pour le service Commandes
+  db-commandes:
+    image: postgres:14
+    container_name: microservices_db_commandes
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: commandes_db
+    volumes:
+      - pgdata_commandes:/var/lib/postgresql/data
+    ports:
+      - "5437:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Base de données pour le service Orchestrateur
+  db-orchestrateur:
+    image: postgres:14
+    container_name: microservices_db_orchestrateur
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: orchestrateur_db
+    volumes:
+      - pgdata_orchestrateur:/var/lib/postgresql/data
+    ports:
+      - "5438:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
+
+  # Service Produits
+  service-produits:
+    build:
+      context: ./service-produits
+      dockerfile: Dockerfile
+    container_name: service_produits
+    depends_on:
+      db-produits:
+        condition: service_healthy
+    environment:
+      - DB_HOST=db-produits
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=produits_db
+      - PORT=3001
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./service-produits:/app:delegated
+      - /app/node_modules
+    restart: unless-stopped
+
+  # Service Clients
+  service-clients:
+    build:
+      context: ./service-clients
+      dockerfile: Dockerfile
+    container_name: service_clients
+    depends_on:
+      db-clients:
+        condition: service_healthy
+    environment:
+      - DB_HOST=db-clients
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=clients_db
+      - PORT=3005
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+    ports:
+      - "3005:3005"
+    volumes:
+      - ./service-clients:/app:delegated
+      - /app/node_modules
+    restart: unless-stopped
+
+  # Service Ventes
+  service-ventes:
+    build:
+      context: ./service-ventes
+      dockerfile: Dockerfile
+    container_name: service_ventes
+    depends_on:
+      db-ventes:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      - DB_HOST=db-ventes
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=ventes_db
+      - PORT=3002
+      - REDIS_HOST=redis
+      - EVENTS_PAYMENTS_STREAM=payments.events
+      - EVENTS_ORDERS_STREAM=orders.events
+      - EVENTS_STOCK_STREAM=stock.events
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./service-ventes:/app:delegated
+      - /app/node_modules
+    restart: unless-stopped
+
+  # Service Stock
+  service-stock:
+    build:
+      context: ./service-stock
+      dockerfile: Dockerfile
+    container_name: service_stock
+    depends_on:
+      db-stock:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      - DB_HOST=db-stock
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=stock_db
+      - PORT=3003
+      - REDIS_HOST=redis
+      - EVENTS_PAYMENTS_STREAM=payments.events
+      - EVENTS_ORDERS_STREAM=orders.events
+      - EVENTS_STOCK_STREAM=stock.events
+    ports:
+      - "3003:3003"
+    volumes:
+      - ./service-stock:/app:delegated
+      - /app/node_modules
+    restart: unless-stopped
+
+  # Service Panier - Instance 1
+  service-panier-1:
+    build:
+      context: ./service-panier
+      dockerfile: Dockerfile
+    container_name: service_panier_1
+    depends_on:
+      db-panier:
+        condition: service_healthy
+    environment:
+      - DB_HOST=db-panier
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=panier_db
+      - PORT=3006
+      - INSTANCE_ID=1
+    ports:
+      - "3006:3006"
+    volumes:
+      - ./service-panier:/app:delegated
+      - /app/node_modules
+    restart: unless-stopped
+
+  # Service Panier - Instance 2
+  service-panier-2:
+    build:
+      context: ./service-panier
+      dockerfile: Dockerfile
+    container_name: service_panier_2
+    depends_on:
+      db-panier:
+        condition: service_healthy
+    environment:
+      - DB_HOST=db-panier
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=panier_db
+      - PORT=3006
+      - INSTANCE_ID=2
+    ports:
+      - "3008:3006"
+    volumes:
+      - ./service-panier:/app:delegated
+      - /app/node_modules
+    restart: unless-stopped
+
+  # Service Commandes
+  service-commandes:
+    build:
+      context: ./service-commandes
+      dockerfile: Dockerfile
+    container_name: service_commandes
+    depends_on:
+      db-commandes:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      - DB_HOST=db-commandes
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=commandes_db
+      - PORT=3007
+      - REDIS_HOST=redis
+      - EVENTS_PAYMENTS_STREAM=payments.events
+      - EVENTS_ORDERS_STREAM=orders.events
+      - EVENTS_STOCK_STREAM=stock.events
+    ports:
+      - "3007:3007"
+    volumes:
+      - ./service-commandes:/app:delegated
+      - /app/node_modules
+    restart: unless-stopped
+
+  # Service Orchestrateur
+  service-orchestrateur:
+    build:
+      context: ./service-orchestrateur
+      dockerfile: Dockerfile
+    container_name: service_orchestrateur
+    depends_on:
+      db-orchestrateur:
+        condition: service_healthy
+      service-stock:
+        condition: service_started
+      service-ventes:
+        condition: service_started
+      service-commandes:
+        condition: service_started
+    environment:
+      - DB_HOST=db-orchestrateur
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=orchestrateur_db
+      - PORT=3010
+      - STOCK_SERVICE_URL=http://service-stock:3003
+      - VENTES_SERVICE_URL=http://service-ventes:3002
+      - COMMANDES_SERVICE_URL=http://service-commandes:3007
+    ports:
+      - "3010:3010"
+    volumes:
+      - ./service-orchestrateur:/app:delegated
+      - /app/node_modules
+    restart: unless-stopped
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: api_gateway
+    depends_on:
+      - service-produits
+      - service-clients
+      - service-ventes
+      - service-stock
+      - service-panier-1
+      - service-panier-2
+      - service-commandes
+      - service-orchestrateur
+    environment:
+      - PORT=3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./api-gateway:/app:delegated
+      - /app/node_modules
+    restart: unless-stopped
+
+  # Frontend Client
+  frontend-client:
+    build:
+      context: ./frontend-client
+      dockerfile: Dockerfile
+    container_name: frontend_client
+    depends_on:
+      - api-gateway
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend-client/public:/usr/share/nginx/html:ro
+    restart: unless-stopped
+
+  # Event Store (SQLite interne, consomme tous les événements via Redis Streams)
+  service-event-store:
+    build:
+      context: ./service-event-store
+      dockerfile: Dockerfile
+    container_name: service_event_store
+    depends_on:
+      redis:
+        condition: service_started
+    environment:
+      - PORT=3011
+      - REDIS_HOST=redis
+      - EVENTS_PAYMENTS_STREAM=payments.events
+      - EVENTS_ORDERS_STREAM=orders.events
+      - EVENTS_STOCK_STREAM=stock.events
+    ports:
+      - "3011:3011"
+    volumes:
+      - ./service-event-store:/app:delegated
+      - /app/node_modules
+    restart: unless-stopped
+
+  # CQRS Command Service - publie des événements
+  service-api-command:
+    build:
+      context: ./service-api-command
+      dockerfile: Dockerfile
+    container_name: service_api_command
+    depends_on:
+      redis:
+        condition: service_started
+    environment:
+      - PORT=3012
+      - REDIS_HOST=redis
+      - EVENTS_ORDERS_STREAM=orders.events
+    ports:
+      - "3012:3012"
+    volumes:
+      - ./service-api-command:/app:delegated
+      - /app/node_modules
+    restart: unless-stopped
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3009:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+    restart: unless-stopped
+
+
+
+volumes:
+  pgdata_produits:
+  pgdata_clients:
+  pgdata_ventes:
+  pgdata_stock:
+  pgdata_panier:
+  pgdata_commandes:
+  pgdata_orchestrateur:
+  prometheus_data:
+  grafana_data: 

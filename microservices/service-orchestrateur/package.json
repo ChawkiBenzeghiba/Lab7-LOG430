@@ -1,0 +1,28 @@
+{
+  "name": "service-orchestrateur",
+  "version": "1.0.0",
+  "description": "Service orchestrateur pour la gestion des sagas de commandes",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "sequelize": "^6.35.0",
+    "pg": "^8.11.3",
+    "pg-hstore": "^2.3.4",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "prom-client": "^15.0.0",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": ["saga", "orchestrateur", "microservices"],
+  "author": "LOG430",
+  "license": "MIT"
+}

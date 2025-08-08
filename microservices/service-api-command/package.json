@@ -1,0 +1,24 @@
+{
+  "name": "service-api-command",
+  "version": "1.0.0",
+  "description": "CQRS Command service - publie des événements",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "ioredis": "^5.4.1",
+    "uuid": "^9.0.1",
+    "prom-client": "^15.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "keywords": ["cqrs", "command", "events", "microservices"],
+  "author": "LOG430",
+  "license": "MIT"
+}

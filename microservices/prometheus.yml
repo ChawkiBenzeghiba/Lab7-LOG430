@@ -1,0 +1,76 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Prometheus lui-même
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # API Gateway
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:3000']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  # Service Produits
+  - job_name: 'service-produits'
+    static_configs:
+      - targets: ['service-produits:3001']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  # Service Panier Instance 1
+  - job_name: 'service-panier-1'
+    static_configs:
+      - targets: ['service-panier-1:3006']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  # Service Panier Instance 2
+  - job_name: 'service-panier-2'
+    static_configs:
+      - targets: ['service-panier-2:3006']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  # Service Commandes
+  - job_name: 'service-commandes'
+    static_configs:
+      - targets: ['service-commandes:3007']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  # Service Stock
+  - job_name: 'service-stock'
+    static_configs:
+      - targets: ['service-stock:3003']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  # Service Orchestrateur
+  - job_name: 'service-orchestrateur'
+    static_configs:
+      - targets: ['service-orchestrateur:3010']
+    metrics_path: '/metrics'
+    scrape_interval: 5s 
+
+  # Event Store
+  - job_name: 'service-event-store'
+    static_configs:
+      - targets: ['service-event-store:3011']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  # CQRS Command Service
+  - job_name: 'service-api-command'
+    static_configs:
+      - targets: ['service-api-command:3012']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
