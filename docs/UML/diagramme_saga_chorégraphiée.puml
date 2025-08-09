@@ -1,0 +1,57 @@
+@startuml
+title Saga Chorégraphiée - Processus de Commande E-commerce
+
+participant "Client" as C
+participant "Service\nCommandes" as SC
+participant "Service\nStock" as SS
+participant "Service\nVentes" as SV
+participant "Redis\nStreams" as RS
+
+C -> SC: POST /api/commandes/{clientId}/publier
+activate SC
+SC --> C: 202 Accepted
+SC -> RS: OrderCreated
+deactivate SC
+
+RS -> SS: OrderCreated
+activate SS
+SS -> SS: Vérifier stock
+alt Stock suffisant
+    SS -> RS: StockReserved
+    deactivate SS
+    
+    RS -> SV: StockReserved
+    activate SV
+    alt Montant < 5000
+        SV -> RS: PaymentAuthorized
+        deactivate SV
+        
+        RS -> SC: PaymentAuthorized
+        activate SC
+        SC -> RS: OrderConfirmed
+        deactivate SC
+    else Montant >= 5000
+        SV -> RS: PaymentFailed
+        deactivate SV
+        
+        RS -> SC: PaymentFailed
+        activate SC
+        SC -> RS: OrderCancelled
+        deactivate SC
+    end
+else Stock insuffisant
+    SS -> RS: StockReservationFailed
+    deactivate SS
+    
+    RS -> SV: StockReservationFailed
+    activate SV
+    SV -> RS: PaymentFailed
+    deactivate SV
+    
+    RS -> SC: PaymentFailed
+    activate SC
+    SC -> RS: OrderCancelled
+    deactivate SC
+end
+
+@enduml
