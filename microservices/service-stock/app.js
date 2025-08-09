@@ -6,6 +6,7 @@ const { initialiserStock } = require('./init-data');
 const Redis = require('ioredis');
 const { v4: uuidv4 } = require('uuid');
 const promClient = require('prom-client');
+const axios = require('axios'); // Added axios for stock verification
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -42,16 +43,55 @@ async function pollOrders() {
             const eventStr = fields[1];
             const event = JSON.parse(eventStr);
             if (event.type === 'OrderCreated') {
-              const reserved = true; // strict minimum: réserver toujours
-              const nextEvent = {
-                id: uuidv4(),
-                type: reserved ? 'StockReserved' : 'StockReservationFailed',
-                timestamp: new Date().toISOString(),
-                payload: { orderId: event.id, items: event.payload.items }
-              };
-              await redis.xadd(EVENTS_STOCK_STREAM, '*', 'event', JSON.stringify(nextEvent));
-              consumedCounter.labels('OrderCreated').inc();
-              producedCounter.labels(nextEvent.type).inc();
+              // Vérifier le stock disponible avant de réserver
+              try {
+                const stockResponse = await axios.get(`http://service-stock:3003/api/stock/stock-central`);
+                const stockData = stockResponse.data;
+                const items = event.payload.items || [];
+                
+                // Vérifier la disponibilité pour tous les produits
+                let stockSuffisant = true;
+                for (const item of items) {
+                  const stockDisponible = stockData.inventaire[item.produitId] || 0;
+                  if (stockDisponible < item.quantite) {
+                    stockSuffisant = false;
+                    break;
+                  }
+                }
+                
+                const nextEvent = {
+                  id: uuidv4(),
+                  type: stockSuffisant ? 'StockReserved' : 'StockReservationFailed',
+                  timestamp: new Date().toISOString(),
+                  payload: { 
+                    orderId: event.id, 
+                    items: event.payload.items,
+                    reason: stockSuffisant ? null : 'Stock insuffisant'
+                  }
+                };
+                
+                await redis.xadd(EVENTS_STOCK_STREAM, '*', 'event', JSON.stringify(nextEvent));
+                consumedCounter.labels('OrderCreated').inc();
+                producedCounter.labels(nextEvent.type).inc();
+                
+                console.log(`Stock ${stockSuffisant ? 'réservé' : 'réservation échouée'} pour orderId ${event.id}`);
+              } catch (error) {
+                console.error('Erreur lors de la vérification du stock:', error);
+                // En cas d'erreur, publier un échec
+                const failedEvent = {
+                  id: uuidv4(),
+                  type: 'StockReservationFailed',
+                  timestamp: new Date().toISOString(),
+                  payload: { 
+                    orderId: event.id, 
+                    items: event.payload.items,
+                    reason: 'Erreur de vérification du stock'
+                  }
+                };
+                await redis.xadd(EVENTS_STOCK_STREAM, '*', 'event', JSON.stringify(failedEvent));
+                consumedCounter.labels('OrderCreated').inc();
+                producedCounter.labels('StockReservationFailed').inc();
+              }
             }
           }
         }

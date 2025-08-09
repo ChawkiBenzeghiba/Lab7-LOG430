@@ -40,17 +40,45 @@ async function pollStockReservations() {
             lastId = id;
             const eventStr = fields[1];
             const event = JSON.parse(eventStr);
+            
             if (event.type === 'StockReserved') {
-              const authorized = true; // strict minimum: autoriser toujours
+              // Simuler un traitement de paiement plus réaliste
+              const montant = event.payload.total || 100; // Montant par défaut
+              const authorized = montant < 5000; // Règle de test : échec si montant >= 5000
+              
               const nextEvent = {
                 id: uuidv4(),
                 type: authorized ? 'PaymentAuthorized' : 'PaymentFailed',
                 timestamp: new Date().toISOString(),
-                payload: { orderId: event.payload.orderId }
+                payload: { 
+                  orderId: event.payload.orderId,
+                  montant: montant,
+                  reason: authorized ? null : 'Montant trop élevé (règle de test)'
+                }
               };
+              
               await redis.xadd(EVENTS_PAYMENTS_STREAM, '*', 'event', JSON.stringify(nextEvent));
               consumedCounter.labels('StockReserved').inc();
               producedCounter.labels(nextEvent.type).inc();
+              
+              console.log(`Paiement ${authorized ? 'autorisé' : 'échoué'} pour orderId ${event.payload.orderId}, montant: ${montant}`);
+            } else if (event.type === 'StockReservationFailed') {
+              // Si la réservation de stock échoue, publier directement un échec de paiement
+              const failedEvent = {
+                id: uuidv4(),
+                type: 'PaymentFailed',
+                timestamp: new Date().toISOString(),
+                payload: { 
+                  orderId: event.payload.orderId,
+                  reason: event.payload.reason || 'Réservation de stock échouée'
+                }
+              };
+              
+              await redis.xadd(EVENTS_PAYMENTS_STREAM, '*', 'event', JSON.stringify(failedEvent));
+              consumedCounter.labels('StockReservationFailed').inc();
+              producedCounter.labels('PaymentFailed').inc();
+              
+              console.log(`Paiement échoué pour orderId ${event.payload.orderId} - raison: ${event.payload.reason}`);
             }
           }
         }

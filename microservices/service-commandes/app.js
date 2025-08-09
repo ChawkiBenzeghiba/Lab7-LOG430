@@ -82,20 +82,38 @@ async function pollPayments() {
             const eventStr = fields[1];
             const event = JSON.parse(eventStr);
             consumedCounter.labels(event.type).inc();
+            
             if (event.type === 'PaymentAuthorized') {
               console.log('PaymentAuthorized reçu pour orderId', event.payload.orderId);
-              // Ici, mettre à jour l'état commande si nécessaire
+              // Publier l'événement de confirmation de commande
+              const confirmEvent = {
+                id: uuidv4(),
+                type: 'OrderConfirmed',
+                timestamp: new Date().toISOString(),
+                payload: { 
+                  orderId: event.payload.orderId,
+                  montant: event.payload.montant
+                }
+              };
+              await redis.xadd(EVENTS_ORDERS_STREAM, '*', 'event', JSON.stringify(confirmEvent));
+              producedCounter.labels('OrderConfirmed').inc();
+              console.log(`Commande confirmée pour orderId ${event.payload.orderId}`);
+              
             } else if (event.type === 'PaymentFailed') {
               console.log('PaymentFailed reçu pour orderId', event.payload.orderId);
-              // Publier compensation: OrderCancelled (strict minimum)
+              // Publier compensation: OrderCancelled
               const cancelEvent = {
                 id: uuidv4(),
                 type: 'OrderCancelled',
                 timestamp: new Date().toISOString(),
-                payload: { orderId: event.payload.orderId }
+                payload: { 
+                  orderId: event.payload.orderId,
+                  reason: event.payload.reason || 'Paiement échoué'
+                }
               };
               await redis.xadd(EVENTS_ORDERS_STREAM, '*', 'event', JSON.stringify(cancelEvent));
               producedCounter.labels('OrderCancelled').inc();
+              console.log(`Commande annulée pour orderId ${event.payload.orderId} - raison: ${event.payload.reason}`);
             }
           }
         }

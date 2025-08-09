@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "=== TEST SAGA CHORÉGRAPHIÉE LABO 7 ==="
+echo "=== TEST SAGA CHORÉGRAPHIÉE LABO 7 - VERSION AMÉLIORÉE ==="
 echo ""
 
 # Configuration
@@ -21,16 +21,17 @@ SAGA_EVENTS=()
 
 # Fonction pour publier une commande (démarre la saga)
 start_saga() {
-    echo -n "Démarrer saga - Publier OrderCreated... "
+    local montant=$1
+    echo -n "Démarrer saga - Publier OrderCreated (montant: $montant)... "
     response=$(curl -s -X POST "$SERVICE_COMMANDES/api/commandes/1/publier" \
         -H "Content-Type: application/json" \
-        -d '{
-            "items": [
-                {"produitId": 1, "quantite": 3, "prixUnitaire": 15.00},
-                {"produitId": 2, "quantite": 2, "prixUnitaire": 30.00}
+        -d "{
+            \"items\": [
+                {\"produitId\": 1, \"quantite\": 3, \"prixUnitaire\": 15.00},
+                {\"produitId\": 2, \"quantite\": 2, \"prixUnitaire\": 30.00}
             ],
-            "total": 105.00
-        }' 2>/dev/null)
+            \"total\": $montant
+        }" 2>/dev/null)
     
     if echo "$response" | grep -q "published.*true"; then
         echo -e "${GREEN}✓ OK${NC}"
@@ -53,7 +54,7 @@ wait_for_saga_events() {
 # Fonction pour vérifier le flux heureux de la saga
 test_happy_path() {
     echo "Test du flux heureux de la saga:"
-    echo "  OrderCreated → StockReserved → PaymentAuthorized"
+    echo "  OrderCreated → StockReserved → PaymentAuthorized → OrderConfirmed"
     
     # Vérifier les événements dans l'Event Store
     response=$(curl -s "$EVENT_STORE/state/$ORDER_ID" 2>/dev/null)
@@ -65,6 +66,7 @@ test_happy_path() {
     has_order_created=false
     has_stock_reserved=false
     has_payment_authorized=false
+    has_order_confirmed=false
     
     while IFS= read -r event_type; do
         case $event_type in
@@ -80,10 +82,14 @@ test_happy_path() {
                 has_payment_authorized=true
                 echo -e "    ${GREEN}✓ PaymentAuthorized${NC}"
                 ;;
+            "OrderConfirmed")
+                has_order_confirmed=true
+                echo -e "    ${GREEN}✓ OrderConfirmed${NC}"
+                ;;
         esac
     done <<< "$event_types"
     
-    if [ "$has_order_created" = true ] && [ "$has_stock_reserved" = true ] && [ "$has_payment_authorized" = true ]; then
+    if [ "$has_order_created" = true ] && [ "$has_stock_reserved" = true ] && [ "$has_payment_authorized" = true ] && [ "$has_order_confirmed" = true ]; then
         echo -e "  ${GREEN}✓ Flux heureux complet${NC}"
         return 0
     else
@@ -92,10 +98,61 @@ test_happy_path() {
     fi
 }
 
-# Fonction pour simuler un échec de paiement (compensation)
+# Fonction pour tester l'échec de paiement (montant élevé)
+test_payment_failure() {
+    echo ""
+    echo "Test d'échec de paiement (montant élevé):"
+    echo "  OrderCreated → StockReserved → PaymentFailed → OrderCancelled"
+    
+    # Démarrer une nouvelle saga avec un montant élevé
+    start_saga 6000
+    wait_for_saga_events
+    
+    # Vérifier les événements dans l'Event Store
+    response=$(curl -s "$EVENT_STORE/state/$ORDER_ID" 2>/dev/null)
+    
+    # Extraire les types d'événements
+    event_types=$(echo "$response" | grep -o '"type":"[^"]*"' | sed 's/"type":"//g' | sed 's/"//g')
+    
+    has_order_created=false
+    has_stock_reserved=false
+    has_payment_failed=false
+    has_order_cancelled=false
+    
+    while IFS= read -r event_type; do
+        case $event_type in
+            "OrderCreated")
+                has_order_created=true
+                echo -e "    ${GREEN}✓ OrderCreated${NC}"
+                ;;
+            "StockReserved")
+                has_stock_reserved=true
+                echo -e "    ${GREEN}✓ StockReserved${NC}"
+                ;;
+            "PaymentFailed")
+                has_payment_failed=true
+                echo -e "    ${GREEN}✓ PaymentFailed${NC}"
+                ;;
+            "OrderCancelled")
+                has_order_cancelled=true
+                echo -e "    ${GREEN}✓ OrderCancelled${NC}"
+                ;;
+        esac
+    done <<< "$event_types"
+    
+    if [ "$has_order_created" = true ] && [ "$has_stock_reserved" = true ] && [ "$has_payment_failed" = true ] && [ "$has_order_cancelled" = true ]; then
+        echo -e "  ${GREEN}✓ Compensation réussie${NC}"
+        return 0
+    else
+        echo -e "  ${RED}✗ Compensation échouée${NC}"
+        return 1
+    fi
+}
+
+# Fonction pour simuler un échec de paiement manuel (compensation)
 simulate_payment_failure() {
     echo ""
-    echo "Simulation d'un échec de paiement (compensation):"
+    echo "Simulation d'un échec de paiement manuel (compensation):"
     
     # Publier directement un événement PaymentFailed
     echo -n "Publier PaymentFailed... "
@@ -104,7 +161,7 @@ simulate_payment_failure() {
     "id": "payment-failed-$(date +%s)-$(openssl rand -hex 8)",
     "type": "PaymentFailed",
     "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)",
-    "payload": {"orderId": "$ORDER_ID"}
+    "payload": {"orderId": "$ORDER_ID", "reason": "Test manuel"}
 }
 EOF
 )
@@ -121,13 +178,13 @@ EOF
     fi
 }
 
-# Fonction pour vérifier la compensation
-test_compensation() {
+# Fonction pour vérifier la compensation manuelle
+test_manual_compensation() {
     echo -n "Attendre compensation... "
     sleep 3
     echo -e "${GREEN}✓ OK${NC}"
     
-    echo "Vérifier la compensation:"
+    echo "Vérifier la compensation manuelle:"
     echo "  PaymentFailed → OrderCancelled"
     
     # Vérifier les événements dans l'Event Store
@@ -153,10 +210,10 @@ test_compensation() {
     done <<< "$event_types"
     
     if [ "$has_payment_failed" = true ] && [ "$has_order_cancelled" = true ]; then
-        echo -e "  ${GREEN}✓ Compensation réussie${NC}"
+        echo -e "  ${GREEN}✓ Compensation manuelle réussie${NC}"
         return 0
     else
-        echo -e "  ${RED}✗ Compensation échouée${NC}"
+        echo -e "  ${RED}✗ Compensation manuelle échouée${NC}"
         return 1
     fi
 }
@@ -219,28 +276,33 @@ test_saga_metrics() {
 
 # Tests principaux
 echo "1. Test du flux heureux de la saga..."
-start_saga
+start_saga 100
 wait_for_saga_events
 test_happy_path
 
 echo ""
-echo "2. Test de la compensation..."
-simulate_payment_failure
-test_compensation
+echo "2. Test d'échec de paiement (montant élevé)..."
+test_payment_failure
 
 echo ""
-echo "3. Test d'idempotence..."
+echo "3. Test de compensation manuelle..."
+start_saga 200
+wait_for_saga_events
+simulate_payment_failure
+test_manual_compensation
+
+echo ""
+echo "4. Test d'idempotence..."
 test_idempotence
 
 echo ""
-echo "4. Test des métriques..."
+echo "5. Test des métriques..."
 test_saga_metrics
 
 echo ""
-echo "=== RÉSUMÉ SAGA CHORÉGRAPHIÉE ==="
-echo "Flux heureux: OrderCreated → StockReserved → PaymentAuthorized"
+echo "=== RÉSUMÉ SAGA CHORÉGRAPHIÉE AMÉLIORÉE ==="
+echo "Flux heureux: OrderCreated → StockReserved → PaymentAuthorized → OrderConfirmed"
 echo "Compensation: PaymentFailed → OrderCancelled"
+echo "Échec de paiement: Montant >= 5000 → PaymentFailed → OrderCancelled"
 echo "Idempotence respectée"
-echo "Métriques disponibles"
-echo ""
-echo "Saga chorégraphiée opérationnelle!"
+echo "Métriques Prometheus intégrées"
